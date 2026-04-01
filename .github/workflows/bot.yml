@@ -1,0 +1,36 @@
+name: Bot Número das Guias
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'
+
+jobs:
+  executar-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Instalar navegadores do Playwright
+        run: npx playwright install --with-deps
+
+      - name: Executar bot
+        env:
+          USUARIO_ASSIM: ${{ secrets.USUARIO_ASSIM }}
+          SENHA_ASSIM: ${{ secrets.SENHA_ASSIM }}
+          ORBITA_URL: ${{ secrets.ORBITA_URL }}
+          ORBITA_USER: ${{ secrets.ORBITA_USER }}
+          ORBITA_PASS: ${{ secrets.ORBITA_PASS }}
+          HEADLESS: true
+        run: node src/main.js
