@@ -1,0 +1,28 @@
+{
+  "name": "numero_das_guias",
+  "version": "1.0.0",
+  "description": "Bot para automação de preenchimento de números de guias",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "dev": "nodemon src/main.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "universo-aba",
+    "automacao",
+    "guias",
+    "bot"
+  ],
+  "author": "Universo ABA",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "pdf-parse": "^1.1.1",
+    "playwright": "^1.59.0",
+    "puppeteer": "^19.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
