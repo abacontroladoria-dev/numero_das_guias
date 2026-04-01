@@ -6,5 +6,5 @@ module.exports = {
   orbitaUser: process.env.ORBITA_USER,
   orbitaPass: process.env.ORBITA_PASS,
   orbitaUrl: process.env.ORBITA_URL,
-  headless: process.env.HEADLESS === 'false'
+  headless: process.env.HEADLESS === 'true'
 };
