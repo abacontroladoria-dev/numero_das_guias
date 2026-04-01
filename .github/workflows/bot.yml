@@ -22,8 +22,8 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      - name: Instalar navegadores do Playwright
-        run: npx playwright install --with-deps
+      - name: Instalar apenas o Chromium
+        run: npx playwright install chromium --with-deps
 
       - name: Executar bot
         env:
