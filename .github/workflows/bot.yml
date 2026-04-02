@@ -3,7 +3,17 @@ name: Bot Número das Guias
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 11 * * 1-5'
+    - cron: '0 12 * * 1-5'
+    - cron: '0 13 * * 1-5'
+    - cron: '0 14 * * 1-5'
+    - cron: '0 15 * * 1-5'
+    - cron: '0 16 * * 1-5'
+    - cron: '0 17 * * 1-5'
+    - cron: '0 18 * * 1-5'
+    - cron: '0 19 * * 1-5'
+    - cron: '0 20 * * 1-5'
+    - cron: '0 21 * * 1-5'
 
 jobs:
   executar-bot:
@@ -32,5 +42,7 @@ jobs:
           ORBITA_URL: ${{ secrets.ORBITA_URL }}
           ORBITA_USER: ${{ secrets.ORBITA_USER }}
           ORBITA_PASS: ${{ secrets.ORBITA_PASS }}
+          HEADLESS: true
+        run: node src/main.js
           HEADLESS: true
         run: node src/main.js
