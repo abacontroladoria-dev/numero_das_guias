@@ -5,7 +5,6 @@ const path = require('path');
 const config = require('../config');
 
 async function getAssimFrame(page) {
-
   await page.waitForSelector('frame[name="home"]', { timeout: 30000 });
   const frame = page.frame({ name: 'home' });
   if (!frame) {
@@ -14,16 +13,47 @@ async function getAssimFrame(page) {
   return frame;
 }
 
+// Fecha modais e banners que o site exibe ao carregar
+async function fecharModais(page) {
+
+  // Modal de "Novidade na Área!" — botão × no canto superior direito
+  try {
+    await page.waitForSelector('.modal .close, button[data-dismiss="modal"]', { timeout: 5000 });
+    await page.click('.modal .close, button[data-dismiss="modal"]');
+    console.log('   ✓ Modal de novidade fechado.');
+  } catch {
+    console.log('   ℹ️  Modal de novidade não encontrado.');
+  }
+
+  // Banner de cookies — clica em "Rejeitar"
+  try {
+    await page.waitForSelector('button:has-text("Rejeitar")', { timeout: 5000 });
+    await page.click('button:has-text("Rejeitar")');
+    console.log('   ✓ Banner de cookies fechado.');
+  } catch {
+    console.log('   ℹ️  Banner de cookies não encontrado.');
+  }
+
+  // Botão de chat flutuante (ícone × no canto direito da tela)
+  try {
+    await page.waitForSelector('.chat-close, [class*="close"][class*="chat"]', { timeout: 3000 });
+    await page.click('.chat-close, [class*="close"][class*="chat"]');
+    console.log('   ✓ Widget de chat fechado.');
+  } catch {
+    // Silencioso — esse elemento nem sempre aparece
+  }
+}
+
 async function baixarEExtrairAsim(usuario, senha) {
   let browser;
   try {
     console.log('📥 [ETAPA 1] Site ASSIM');
 
-		browser = await chromium.launch({
-		  headless: config.headless,
-		  args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-		  timeout: 60000
-		});
+    browser = await chromium.launch({
+      headless: config.headless,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      timeout: 60000
+    });
 
     const context = await browser.newContext({
       acceptDownloads: true
@@ -34,62 +64,57 @@ async function baixarEExtrairAsim(usuario, senha) {
     const downloadPath = path.join(__dirname, '..', '..', '.temp');
 
     if (!fs.existsSync(downloadPath)) {
-
       fs.mkdirSync(downloadPath, { recursive: true });
-
     }
 
+    ////////////////////////////////// Acessando a página de Credenciado Médico //////////////////////////////////
 
+    console.log('   ⏳ Acessando a página de Credenciado Médico...');
 
-////////////////////////////////// Acessando a página de Credenciado Médico //////////////////////////////////
-	
-	
-	console.log('   ⏳ Acessando a página de Credenciado Médico...');
+    // CORREÇÃO: trocado 'networkidle' por 'domcontentloaded'.
+    // 'networkidle' exige 500ms sem nenhuma requisição em rede — impossível neste site,
+    // que dispara modais, analytics e rastreadores continuamente, causando timeout de 60s.
+    await page.goto('https://assim.com.br/site/?area=credenciado', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000
+    });
 
-	await page.goto('https://assim.com.br/site/?area=credenciado', {  waitUntil: 'networkidle',  timeout: 60000});
-	await page.waitForTimeout(2000);
-	
-	await page.mouse.click(10, 10); //tira pop-up
-	
-	await page.waitForTimeout(1000);
-	
+    // CORREÇÃO: aguarda o formulário existir no DOM antes de prosseguir,
+    // em vez de usar waitForTimeout com tempo fixo (que pode ser curto ou longo demais).
+    await page.waitForSelector('#formCredenciado', { timeout: 30000 });
 
+    // CORREÇÃO: fecha modais de forma explícita e tolerante a falhas,
+    // em vez de mouse.click(10, 10) que não fecha nenhum dos modais reais do site.
+    await fecharModais(page);
 
-////////////////////////////////// Fim do acesso a página de Credenciado Médico //////////////////////////////////
+    ////////////////////////////////// Fim do acesso a página de Credenciado Médico //////////////////////////////////
 
-
-
-
-////////////////////////////////// Inserindo Usuário e Senha //////////////////////////////////
+    ////////////////////////////////// Inserindo Usuário e Senha //////////////////////////////////
 
     console.log('   ⏳ Preenchendo credenciais...');
 
-	const formCredenciado = page.locator('#formCredenciado');
+    const formCredenciado = page.locator('#formCredenciado');
 
-	await formCredenciado.locator('#login').fill(usuario);
+    await formCredenciado.locator('#login').fill(usuario);
+    await formCredenciado.locator('#input-senha').fill(senha);
+    await formCredenciado.locator('button[type="submit"]').click();
 
-	await page.waitForTimeout(500);
+    console.log('   ✓ Acesso realizado.');
 
-	await formCredenciado.locator('#input-senha').fill(senha);
+    ////////////////////////////////// Fim - Usuário e Senha //////////////////////////////////
 
-	await page.waitForTimeout(500);
+    ////////////////////////////////// Navegando Para Download de PDF //////////////////////////////////
 
-	await formCredenciado.locator('button[type="submit"]').click();
-	console.log('   ✓ Acesso realizado.');
+    // Aguarda a página pós-login estabilizar (DOM carregado)
+    await page.waitForLoadState('domcontentloaded');
 
-	await page.waitForTimeout(1000);
+    // Fecha modais que possam ter aparecido após o login
+    await fecharModais(page);
 
-////////////////////////////////// Fim - Usuário e Senha //////////////////////////////////
+    const frame = page.mainFrame();
 
-
-
-
-////////////////////////////////// Navegando Para Download de PDF //////////////////////////////////
-
-	await page.mouse.click(10, 10); //tira pop-up
-	
-	const frame = page.mainFrame();
-	await frame.locator('a, button, [role="button"]').evaluateAll((els) => {
+    // Clica no menu "Padrão TISS" (excluindo itens que contenham "guias")
+    const clicouTiss = await frame.locator('a, button, [role="button"]').evaluateAll((els) => {
       for (const el of els) {
         const texto = (el.innerText || '').toLowerCase();
         if (texto.includes('padrão tiss') && !texto.includes('guias')) {
@@ -99,9 +124,15 @@ async function baixarEExtrairAsim(usuario, senha) {
       }
       return false;
     });
+
+    if (!clicouTiss) {
+      throw new Error('Não foi possível encontrar o menu "Padrão TISS".');
+    }
+
     await page.waitForTimeout(1000);
 
-    await frame.locator('a, button, [role="button"]').evaluateAll((els) => {
+    // Clica no submenu "Guias do Padrão TISS"
+    const clicouGuias = await frame.locator('a, button, [role="button"]').evaluateAll((els) => {
       for (const el of els) {
         const texto = (el.innerText || '').toLowerCase();
         if (texto.includes('guias do padrão tiss')) {
@@ -112,85 +143,35 @@ async function baixarEExtrairAsim(usuario, senha) {
       return false;
     });
 
+    if (!clicouGuias) {
+      throw new Error('Não foi possível encontrar o submenu "Guias do Padrão TISS".');
+    }
+
     await page.waitForTimeout(3000);
 
+    ////////////////////////////////// FIM - Navegando Para Download de PDF //////////////////////////////////
 
-////////////////////////////////// FIM - Navegando Para Download de PDF //////////////////////////////////
-
-
-
-
-//////////////////////////////////// Download de PDF com 20 Guias ////////////////////////////////////
+    //////////////////////////////////// Download de PDF com 20 Guias ////////////////////////////////////
 
     console.log('   ⏳ Selecionando guia...');
-
     await frame.selectOption('select[name="guia"]', '11017_guia_de_sp_sadt');
 
     console.log('   ⏳ Preenchendo quantidade...');
-
     await frame.locator('input[name="qtd"]').fill('20');
 
     console.log('   ⏳ Gerando e baixando PDF...');
-
     const [download] = await Promise.all([
-
       page.waitForEvent('download'),
-
       frame.locator('button.btn-vermelho[type="submit"]').click()
-
     ]);
-  
-	const caminhoArquivo = path.join(downloadPath, download.suggestedFilename());
 
+    const caminhoArquivo = path.join(downloadPath, download.suggestedFilename());
     await download.saveAs(caminhoArquivo);
-
     console.log('   ✓ PDF baixado com sucesso.');
-	
-////////////////////////////////// FIM - Download de PDF com 20 Guias //////////////////////////////////
 
+    ////////////////////////////////// FIM - Download de PDF com 20 Guias //////////////////////////////////
 
-
-
-////////////////////////////////// Leitura PDF - Extração do Código Numérico //////////////////////////////////
+    ////////////////////////////////// Leitura PDF - Extração do Código Numérico //////////////////////////////////
 
     console.log('   ⏳ Lendo arquivo PDF...');
-
-    const dataBuffer = fs.readFileSync(caminhoArquivo);
-
-    const data = await pdfParse(dataBuffer);
-
-	console.log('   ⏳ Extraindo número...');
-
-	const linhas = data.text
-	  .split(/\r?\n/)
-	  .map(l => l.trim())
-	  .filter(l => l);
-
-	console.log('   🔎 Linhas extraídas do PDF:', linhas);
-
-	const match = data.text.match(/\b\d{8}\b/);
-
-	if (!match) {
-	  throw new Error('Não foi possível extrair o número da guia.');
-	}
-
-	const numero = match[0];
-
-	return { numero, caminhoArquivo };
-
-////////////////////////////////// FIM - Leitura PDF - Extração do Código Numérico //////////////////////////////////
-  
-  }catch (error) {
-
-    console.error('❌ Erro na Etapa 1:', error.message);
-
-    throw error;
-
-  } finally {
-
-    if (browser) {
-      await browser.close();
-    }
-  }
-}
-	module.exports = { baixarEExtrairAsim };
+    const dataBuffer = fs
